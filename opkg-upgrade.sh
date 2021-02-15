@@ -4,6 +4,7 @@
 #
 # Created: May / 2017
 # Updated: Dec / 2018
+# Adapted for Tuxbox Jan / 2021 by Thilo Graf
 #
 # Upgrade packages listed by:
 # opkg list-upgradable
@@ -11,8 +12,8 @@
 # Will list packages and ask for confirmation
 # Use ./opkg-upgrade.sh --help for more info
 #
-# This Script:
-# https://github.com/tavinus/opkg-upgrade
+# This Script as origin forked from: https://github.com/tavinus/opkg-upgrade
+# This Script https://github.com/tuxbox-neutrino/opkg-upgrade
 
 
 ### Initialization
@@ -22,8 +23,8 @@ SSMTPBIN="$(command -v ssmtp 2>/dev/null)"
 BANNERSTRING="Simple OPKG Updater v$OPKGUPVERSION"
 TIMESTAMP="$(date '+%Y/%m/%d %H:%M:%S' 2>/dev/null)"
 OPKGUP_INSTALL_DIR='/usr/sbin'
-OPENWRT_RELEASE="/etc/openwrt_release"
-ROUTER_NAME="$(uname -n)"
+OS_RELEASE_FILE="/etc/os_release"
+DEVICE_NAME="$(uname -n)"
 HTML_FONT="font-family:'Trebuchet MS', Helvetica, sans-serif;"
 
 ### Silly SH
@@ -56,10 +57,10 @@ PACKS_COUNT=0
 
 ########################### FUNCTIONS STARTS
 
-# Load info from /etc/openwrt_release into memory
+# Load info from /etc/os_release into memory
 source_release() {
-    if is_file "$OPENWRT_RELEASE"; then
-        . "$OPENWRT_RELEASE"
+    if is_file "$OS_RELEASE_FILE"; then
+        . "$OS_RELEASE_FILE"
     fi
 }
 
@@ -91,7 +92,7 @@ main() {
             else
                 email_data="$(print_txt_email "$uplist")"
             fi
-            #local email_data="$(email_subject)"$'\n\n'"$(print_banner)"$'\n\n'"Report for: $ROUTER_NAME"$'\n\n'"$uplist"$'\n\n'"Generated on: $TIMESTAMP"
+            #local email_data="$(email_subject)"$'\n\n'"$(print_banner)"$'\n\n'"Report for: $DEVICE_NAME"$'\n\n'"$uplist"$'\n\n'"Generated on: $TIMESTAMP"
             if just_print_html; then
                 echo -e "$email_data"
                 exit 0
@@ -107,7 +108,7 @@ main() {
     just_print && exit 0
     opkg_has_update || { echo '' ; exit 0 ; }
     
-    openwrt_is_snapshot && print_snapshot_disclaimer
+    is_snapshot && print_snapshot_disclaimer
 
     if ! no_confirm; then
         if ! confirm_upgrade; then
@@ -145,9 +146,9 @@ list_upgrades() {
     return $FALSE
 }
 
-# Print router info in plain text
+# Print device info in plain text
 print_info_txt() {
-                                           printf "%s\n" "Router name.: $ROUTER_NAME"
+                                           printf "%s\n" "Device name.: $DEVICE_NAME"
     is_not_empty "$DISTRIB_DESCRIPTION" && printf "%s\n" "Description.: $DISTRIB_DESCRIPTION"
     is_not_empty "$DISTRIB_TARGET"      && printf "%s\n" "Target......: $DISTRIB_TARGET"
     is_not_empty "$DISTRIB_ARCH"        && printf "%s\n" "Arch........: $DISTRIB_ARCH"
@@ -360,7 +361,7 @@ print_html_email() {
 
 # prints an email report in txt format
 print_txt_email() {
-    #echo "$(email_subject)"$'\n\n'"$(print_banner)"$'\n\n'"Report for: $ROUTER_NAME"$'\n\n'"$1"$'\n\n'"Generated on: $TIMESTAMP"
+    #echo "$(email_subject)"$'\n\n'"$(print_banner)"$'\n\n'"Report for: $DEVICE_NAME"$'\n\n'"$1"$'\n\n'"Generated on: $TIMESTAMP"
     echo "$(email_subject)"$'\n\n'"$(print_banner)"$'\n\n'"$(print_info_txt)"$'\n\n'"$1"$'\n\n'"Generated on: $TIMESTAMP"
 }
 
@@ -385,7 +386,7 @@ print_html_header() {
     echo $'\n\n''<h2 style="'"$HTML_FONT"' font-size:14pt; margin-top:1.5em; font-weight:bold">'"$(print_banner 'nopadding')"'</h2>'
     echo '<table border="1" width="600px" cellpadding="6pt" cellspacing="0" style="border-collapse:collapse;'"$HTML_FONT"' font-size:11pt">'
     
-    echo '<tr><td style="font-weight:bold">Router Name</td><td>'"$ROUTER_NAME"'</td></tr>'
+    echo '<tr><td style="font-weight:bold">Device Name</td><td>'"$DEVICE_NAME"'</td></tr>'
     is_not_empty "$DISTRIB_DESCRIPTION" && echo '<tr><td style="font-weight:bold">Description</td><td>'"$DISTRIB_DESCRIPTION"'</td></tr>'
     is_not_empty "$DISTRIB_TARGET" && echo '<tr><td style="font-weight:bold">Target</td><td>'"$DISTRIB_TARGET"'</td></tr>'
     is_not_empty "$DISTRIB_ARCH" && echo '<tr><td style="font-weight:bold">Arch</td><td>'"$DISTRIB_ARCH"'</td></tr>'
@@ -512,7 +513,7 @@ opkg_has_update() {
 }
 
 # returns $TRUE if $DISTRIB_RELEASE equals SNAPSHOT
-openwrt_is_snapshot() {
+is_snapshot() {
     [ "$DISTRIB_RELEASE" = "SNAPSHOT" ] && return $TRUE
     return $FALSE
 }
