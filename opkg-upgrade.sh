@@ -3,8 +3,8 @@
 # Gustavo Arnosti Neves
 #
 # Created: May / 2017
-# Adapted: Dec / 2018 for Tuxbox Jan / 2021 by Thilo Graf
-# Updated: Nov / 2022
+# Updated: Dec / 2018
+# Adapted for Tuxbox Jan / 2021, 2024 by Thilo Graf
 #
 # Upgrade packages listed by:
 # opkg list-upgradable
