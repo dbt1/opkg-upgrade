@@ -1,0 +1,23 @@
+#!/bin/sh
+
+opkg update > /dev/null
+if [ $? != 0 ]; then
+	echo -e "\033[1m[ERROR]\033[0m\tget updates from source..."
+	exit 1
+fi
+echo -e "\033[1m[OK]\033[0m\tprepare system update..."
+
+BASEINSTALL="systemd busybox coreutils "
+for B in  $BASEINSTALL ; do
+	opkg install $B > /dev/null;
+	if [ $? != 0 ]; then
+		echo -e "\033[1m[ERROR]\033[0m\t$B..."
+		exit 1
+	fi
+	echo -e "\033[1m[OK]\033[0m\t$B..."
+done
+
+opkg-upgrade.sh -f
+
+
+
