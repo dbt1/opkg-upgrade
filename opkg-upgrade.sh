@@ -3,8 +3,8 @@
 # Gustavo Arnosti Neves
 #
 # Created: May / 2017
-# Updated: Dec / 2018
-# Adapted for Tuxbox Jan / 2021 by Thilo Graf
+# Adapted: Dec / 2018 for Tuxbox Jan / 2021 by Thilo Graf
+# Updated: Nov / 2022
 #
 # Upgrade packages listed by:
 # opkg list-upgradable
@@ -17,9 +17,10 @@
 
 
 ### Initialization
-OPKGUPVERSION="0.3.6"
+OPKGUPVERSION="0.4.1"
 OPKGBIN="$(command -v opkg 2>/dev/null)"
 SSMTPBIN="$(command -v ssmtp 2>/dev/null)"
+MSMTPBIN="$(command -v msmtp 2>/dev/null)"
 BANNERSTRING="Simple OPKG Updater v$OPKGUPVERSION"
 TIMESTAMP="$(date '+%Y/%m/%d %H:%M:%S' 2>/dev/null)"
 OPKGUP_INSTALL_DIR='/usr/sbin'
@@ -38,6 +39,7 @@ FORCE_FLAG=$FALSE
 JUST_CHECK_FLAG=$FALSE
 JUST_PRINT_FLAG=$FALSE
 SSMTP_SEND_FLAG=$FALSE
+MSMTP_SEND_FLAG=$FALSE
 SEND_TO=""
 ALWAYS_SEND_FLAG=$FALSE
 HTML_FORMAT=$TRUE
@@ -83,7 +85,7 @@ main() {
     upgrade_check      # may exit here
 
     local uplist="$(list_upgrades)"
-    if should_send_ssmtp || just_print_html; then
+    if should_send_ssmtp || should_send_msmtp || just_print_html; then
         if opkg_has_update || should_always_send || just_print_html; then
             QUIET_MODE=$FALSE
             local email_data=''
@@ -97,7 +99,11 @@ main() {
                 echo -e "$email_data"
                 exit 0
             else
-                echo -e "$email_data" | "$SSMTPBIN" "$SEND_TO"
+                if should_send_ssmtp; then
+                    echo -e "$email_data" | "$SSMTPBIN" "$SEND_TO"
+                elif should_send_msmtp; then
+                    echo -e "$email_data" | "$MSMTPBIN" "$SEND_TO"
+                fi
                 exit $?
             fi
         fi
@@ -193,6 +199,8 @@ get_options() {
                 QUIET_MODE=$TRUE ; JUST_PRINT_HTML_FLAG=$TRUE ; shift ;;
             -s|--ssmtp)
                 ssmtp_check "$2" ; shift ; shift ;;
+            -m|--msmtp)
+                msmtp_check "$2" ; shift ; shift ;;
             -a|--always-send|--always-Send|--alwayssend|--alwaysSend)
                 ALWAYS_SEND_FLAG=$TRUE ; shift ;;
             -t|--text-only|--text-Only|--textonly|--textOnly)
@@ -263,6 +271,8 @@ Options:
                         Includes subject, mime type and html formated data
   -s, --ssmtp <email>   Use the system's ssmtp to send update reports
                         You need to install and configure ssmtp beforehand
+  -m, --msmtp <email>   Use the system's msmtp to send update reports
+                        You need to install and configure msmtp beforehand
   -a, --always-send     Send e-mail even if there are no updates
                         By default e-mails are only sent when updates are available
   -t, --text-only       Send e-mail in plain text format.
@@ -274,8 +284,8 @@ Options:
 
 Notes:
   - Short options should not be grouped. You must pass each parameter on its own.
-  - You must have a working ssmtp install to use the ssmtp functionality. Make
-    sure you can send e-mails from it before trying from opkg-upgrade.
+  - You must have a working ssmtp or msmtp install to use the email functionality.
+    Make sure you can send e-mails from it before trying from opkg-upgrade.
 
 Examples:
   $OPKGUP_NAME -n -f      # run without updating listings and asking for upgrade
@@ -283,7 +293,7 @@ Examples:
   $OPKGUP_NAME -l         # just print upgrades available
   $OPKGUP_NAME -e         # just print html formatted email
   $OPKGUP_NAME -s 'mail@example.com'    # mail upgrade report if have updates
-  $OPKGUP_NAME -a -s 'mail@example.com' # mail upgrade report even if NO updates
+  $OPKGUP_NAME -a -m 'mail@example.com' # mail upgrade report even if NO updates
   $OPKGUP_NAME -u && echo 'upgrades are available' || echo 'no upgrades available'
 
 "
@@ -476,6 +486,16 @@ is_valid_email() {
     return $TRUE
 }
 
+# check if email is valid or break execution
+validate_email() {
+    if ! is_valid_email "$1"; then
+        print_banner 'error'
+        print_error "Error! You need to specify a valid target e-mail address!"
+        print_error "Invalid address -> $1"
+        exit 30
+    fi
+}
+
 # returns $TRUE if it is a valid file, $FALSE otherwise
 is_file() {
     [ -f "$1" ] && return $TRUE
@@ -558,6 +578,11 @@ should_send_ssmtp() {
     return $SSMTP_SEND_FLAG
 }
 
+# returns $TRUE if we should send email with msmtp, $FALSE otherwise
+should_send_msmtp() {
+    return $MSMTP_SEND_FLAG
+}
+
 # returns $TRUE if we should send the e-mail even if there is no updates, $FALSE otherwise
 should_always_send() {
     return $ALWAYS_SEND_FLAG
@@ -585,15 +610,34 @@ ssmtp_check() {
     if ! find_ssmtp; then
         print_banner 'error'
         print_error "Error! Could not find or run the SSMTP executable, make sure it is installed!"
-        exit 30
+        exit 33
     fi
-    if ! is_valid_email "$1"; then
-        print_banner 'error'
-        print_error "Error! You need to specify a valid target e-mail address!"
-        print_error "Invalid address -> $1"
-        exit 30
-    fi
+    validate_email "$1"
     SSMTP_SEND_FLAG=$TRUE
+    SEND_TO="$1"
+    QUIET_MODE=$TRUE
+}
+
+
+###### MSMTP functions
+
+# Finds and checks for msmtp executable, returns $TRUE if found, $FALSE otherwise
+find_msmtp() {
+    is_executable "$MSMTPBIN" && return $TRUE
+    MSMTPBIN='/usr/sbin/msmtp'
+    is_executable "$MSMTPBIN" && return $TRUE
+    return $FALSE
+}
+
+# Checks for msmtp program, validates the target email and sets globals for emails
+msmtp_check() {
+    if ! find_msmtp; then
+        print_banner 'error'
+        print_error "Error! Could not find or run the MSMTP executable, make sure it is installed!"
+        exit 34
+    fi
+    validate_email "$1"
+    MSMTP_SEND_FLAG=$TRUE
     SEND_TO="$1"
     QUIET_MODE=$TRUE
 }
