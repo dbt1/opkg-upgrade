@@ -1,23 +1,25 @@
 #!/bin/sh
 
-opkg update > /dev/null
-if [ $? != 0 ]; then
-	echo -e "\033[1m[ERROR]\033[0m\tget updates from source..."
-	exit 1
-fi
-echo -e "\033[1m[OK]\033[0m\tprepare system update..."
+check_status() {
+    if [ $1 != 0 ]; then
+        echo -e "\r\033[2K[\e[31mError\e[0m]\t$2 ...failed"
+        exit 1
+    else
+        echo -e "\r\033[2K[\e[32mOK\e[0m]\t$2"
+    fi
+}
 
-BASEINSTALL="systemd busybox coreutils "
-for B in  $BASEINSTALL ; do
-	opkg install $B > /dev/null;
-	if [ $? != 0 ]; then
-		echo -e "\033[1m[ERROR]\033[0m\t$B..."
-		exit 1
-	fi
-	echo -e "\033[1m[OK]\033[0m\t$B..."
+# echo -ne "[ ] Updating source lists...\n"
+opkg update > /dev/null
+check_status $? "Updating source lists"
+
+BASEINSTALL="systemd busybox coreutils"
+for B in $BASEINSTALL; do
+    echo -ne "\r\033[2K[..]\tUpdating $B..."
+    opkg install $B > /dev/null
+    check_status $? "Update for $B"
 done
 
-opkg-upgrade.sh -f
-
-
-
+echo -ne "\r\033[2K[..]\tUpdating system..."
+opkg-upgrade.sh -f > /dev/null
+check_status $? "System update"
