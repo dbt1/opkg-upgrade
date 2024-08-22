@@ -15,11 +15,20 @@ check_status $? "Updating source lists"
 
 BASEINSTALL="systemd busybox coreutils"
 for B in $BASEINSTALL; do
-    echo -ne "\r\033[2K[..]\tUpdating $B..."
-    opkg install $B > /dev/null
-    check_status $? "Update for $B"
+    echo -ne "\r\033[2K[..]\tChecking for updates for $B..."
+
+    # Prüfe, ob ein Update für das Paket verfügbar ist
+    if opkg list-upgradable | grep -q "^$B "; then
+        echo -ne "\r\033[2K[..]\tUpdating $B..."
+        opkg install $B > /dev/null
+        check_status $? "Update for $B"
+    else
+        echo -e "\r\033[2K[\e[33mSkip\e[0m]\tUpdating... No updates available for $B"
+    fi
 done
 
 echo -ne "\r\033[2K[..]\tUpdating system..."
-opkg-upgrade.sh -f > /dev/null
+#opkg-upgrade.sh -f > /dev/null
+opkg-upgrade.sh -f
 check_status $? "System update"
+
