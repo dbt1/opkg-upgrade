@@ -435,14 +435,25 @@ confirm_upgrade() {
 
 # run the upgrade
 do_upgrade() {
+    local current=0
     message_starts $'Upgrading packages\n\n'
-    "$OPKGBIN" install $PACKS_NAMES
-    ret=$?
+
+    for package in $PACKS_NAMES; do
+        current=$((current + 1))
+        echo -ne "[$current/$PACKS_COUNT] Upgrading $package..."
+        "$OPKGBIN" install "$package" >/dev/null 2>&1
+        ret=$?
+        if [ $ret -ne 0 ]; then
+            echo "Error upgrading $package"
+            return $ret
+        fi
+        echo "Done."
+    done
+
     message_ends $'\nUpgrade finished\n'
     echo $'Please check for config file conflicts!\n'
-    return $ret
+    return 0
 }
-
 
 
 ###### SELF INSTALL
