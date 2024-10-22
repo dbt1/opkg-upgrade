@@ -1,0 +1,5 @@
+venv
+template.md
+translate-md-config.json
+.directory
+*.kate-swp
